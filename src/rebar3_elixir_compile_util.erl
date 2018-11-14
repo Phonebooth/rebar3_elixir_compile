@@ -221,10 +221,27 @@ add_states(State, BinDir, Env, Config) ->
     ElixirState = rebar_state:set(BaseDirState, elixir, filename:join(BinDir, "elixir ")),
     rebar_state:set(ElixirState, mix, filename:join(BinDir, "mix ")).    
 
+compile_deps_libs(State, AddToPath) ->
+  Dir = filename:absname("_build/default/lib/"),
+  {ok, Dirs} = rebar_utils:list_dir(Dir),
+  lists:foldl(
+    fun(X, Acc) ->
+        Dir1 = filename:absname("_build/default/lib/" ++ X ++ "/elixir_libs"),
+        case rebar_utils:list_dir(Dir1) of
+          {ok, Apps} ->
+            State1 = rebar_state:set(State, elixir_base_dir, filename:join(rebar_dir:root_dir(State), Dir1)),
+            compile_libs(State1, Apps, AddToPath),
+            Acc;
+          _ ->
+            Acc
+        end
+    end, [], Dirs).
+
 compile_libs(State) ->
     compile_libs(State, false).
 
 compile_libs(State, AddToPath) ->
+  compile_deps_libs(State, AddToPath),
     Dir = rebar_state:get(State, elixir_base_dir),
     file:make_dir(Dir),
     {ok, Apps} = rebar_utils:list_dir(Dir),
