@@ -70,8 +70,12 @@ get_details(State) ->
   Env =
     case os:getenv("MIX_ENV") of
       false ->
-        {env, E} = lists:keyfind(env, 1, Config),
-        E;
+        case lists:keyfind(env, 1, Config) of
+          {env, E} ->
+            E;
+          _ ->
+            <<"prod">>
+        end;
       E ->
         list_to_atom(E)
     end,
