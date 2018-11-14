@@ -310,9 +310,5 @@ maybe_copy_dir(Source, Target, CreateNew) ->
                 false ->  Target;
                 _ -> filename:join([Target, TargetApp])    
               end,
-  case filelib:is_dir(filename:join([Target, TargetApp, "ebin"])) of
-    true -> ok;
-    false ->
-      ec_file:remove(TargetDir, [recurisve]),
-      ec_file:copy(Source, TargetDir, [recursive])
-  end.    
+  ec_file:remove(TargetDir, [recurisve]),
+  ec_file:copy(Source, TargetDir, [recursive]).    
