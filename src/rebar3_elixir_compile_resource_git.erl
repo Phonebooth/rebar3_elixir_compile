@@ -21,7 +21,10 @@ lock(_Dir, {elixir_git, Name, Url}) ->
   {
    elixir_git, 
    rebar3_elixir_compile_util:to_binary(Name),
-   rebar3_elixir_compile_util:to_binary(Url)
+   rebar3_elixir_compile_util:to_binary(Url),
+   {
+    branch, "master"
+   }
   };
 
 lock(_Dir, {elixir_git, Name, Url, {Type, Vsn}}) ->
