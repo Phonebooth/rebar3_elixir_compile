@@ -30,7 +30,7 @@ download(Dir, {elixir_git, Url}, State) ->
   
 download(Dir, {elixir_git, Url, {Type, Vsn}}, State) ->
   Pkg = {git, Url, {Type, Vsn}},
-  DownloadDir = filename:join([rebar_dir:root_dir(State), "_elixir_build/"]),
+  DownloadDir = filename:join([rebar_dir:root_dir(State), "_elixir_build/", filename:basename(Dir)]),
   State1 = rebar_state:set(State, libs_target_dir, default),
   BaseDirState = rebar_state:set(State1, elixir_base_dir, DownloadDir),
   case rebar_git_resource:download(DownloadDir, Pkg, BaseDirState, null) of
