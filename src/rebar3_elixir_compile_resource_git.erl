@@ -2,6 +2,12 @@
 
 -behaviour(rebar_resource).
 
+-export([lock/2
+        ,download/3
+        ,needs_update/2
+        ,make_vsn/1]).
+
+
 lock(_Dir, {elixir_git, Name, {Type, Vsn}}) ->
   {
    elixir_git, 
