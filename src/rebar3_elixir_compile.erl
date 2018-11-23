@@ -4,7 +4,7 @@
 
 init(State) ->
   {ok, State0} = rebar3_elixir_compile_prv_ex_compiler:init(State),
-  State1 = rebar_state:add_resource(State0, {elixir_git, rebar3_elixir_compile_resource}),
+  State1 = rebar_state:add_resource(State0, {elixir_git, rebar3_elixir_compile_resource_git}),
   State2 = rebar_state:add_resource(State1, {elixir, rebar3_elixir_compile_resource}),
   {_BinDir, _Env, _Config, LibDir} = rebar3_elixir_compile_util:get_details(State2),
   code:add_patha(filename:join(LibDir, "elixir/ebin")),
