@@ -74,7 +74,7 @@ get_details(State) ->
           {env, E} ->
             E;
           _ ->
-            <<"prod">>
+            prod
         end;
       E ->
         list_to_atom(E)
