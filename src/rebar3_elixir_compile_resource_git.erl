@@ -1,3 +1,6 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Base On rebar3 git module %%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 -module(rebar3_elixir_compile_resource_git).
 
 -behaviour(rebar_resource).
@@ -7,30 +10,25 @@
         ,needs_update/2
         ,make_vsn/1]).
 
-%% Regex used for parsing scp style remote url
+%% Rebar3 Macros
 -define(SCP_PATTERN, "\\A(?<username>[^@]+)@(?<host>[^:]+):(?<path>.+)\\z").
 -define(FMT(Str, Args), lists:flatten(io_lib:format(Str, Args))).
--define(FAIL, rebar_utils:abort()).
 -define(ABORT(Str, Args), rebar_utils:abort(Str, Args)).
-
--define(CONSOLE(Str, Args), io:format(Str++"~n", Args)).
-
 -define(DEBUG(Str, Args), rebar_log:log(debug, Str, Args)).
--define(INFO(Str, Args), rebar_log:log(info, Str, Args)).
 -define(WARN(Str, Args), rebar_log:log(warn, Str, Args)).
--define(ERROR(Str, Args), rebar_log:log(error, Str, Args)).
--define(CRASHDUMP(Str, Args), rebar_log:crashdump(Str, Args)).
 
-lock(_Dir, {elixir_git, Name}) ->
+lock(_Dir, {elixir_git, Name, Url}) ->
   {
    elixir_git, 
-   rebar3_elixir_compile_util:to_binary(Name)
+   rebar3_elixir_compile_util:to_binary(Name),
+   rebar3_elixir_compile_util:to_binary(Url)
   };
 
-lock(_Dir, {elixir_git, Name, {Type, Vsn}}) ->
+lock(_Dir, {elixir_git, Name, Url, {Type, Vsn}}) ->
   {
    elixir_git, 
    rebar3_elixir_compile_util:to_binary(Name), 
+   rebar3_elixir_compile_util:to_binary(Url),
    {
     Type,
     rebar3_elixir_compile_util:to_binary(Vsn)
@@ -38,42 +36,45 @@ lock(_Dir, {elixir_git, Name, {Type, Vsn}}) ->
   }.
 
 
-download(Dir, {elixir_git, Url}, State) ->
-  download(Dir, {elixir_git, Url, {branch, "master"}}, State);
+download(Dir, {elixir_git, Name, Url}, State) ->
+  download(Dir, {elixir_git, Name, Url, {branch, "master"}}, State);
 
-download(Dir, {elixir_git, Url, {Type, Vsn}}, State) ->
+download(Dir, {elixir_git, Name, Url, {Type, Vsn}}, State) ->
   Pkg = {git, Url, {Type, Vsn}},
-  DownloadDir = filename:join([rebar_dir:root_dir(State), "_elixir_build/", filename:basename(Dir)]),
+  %% Dirs
+  DownloadDir = filename:join([rebar_dir:root_dir(State), "_elixir_build/", Name]),
+  BaseDir = filename:join(rebar_dir:root_dir(State), "_elixir_build/"),
+  ec_file:remove(DownloadDir, [recursive]), %% Remove if exists
+  %% States
   State1 = rebar_state:set(State, libs_target_dir, default),
-  BaseDirState = rebar_state:set(State1, elixir_base_dir, DownloadDir),
-  case download(DownloadDir, Pkg, BaseDirState, null) of
-    ok ->
+  State2 = rebar3_elixir_compile_util:add_elixir(State1),
+  BaseDirState = rebar_state:set(State2, elixir_base_dir, BaseDir),
+  %% Download
+  case download_(DownloadDir, Pkg, BaseDirState) of
+    {ok, _} ->
+      Env = rebar_state:get(BaseDirState, mix_env),
+      rebar3_elixir_compile_util:compile_libs(BaseDirState),
+      LibsDir = rebar3_elixir_compile_util:libs_dir(DownloadDir, Env),
+      %% Copy compile objects
+      rebar3_elixir_compile_util:transfer_libs(rebar_state:set(BaseDirState, libs_target_dir, Dir), [Name], LibsDir),  %% Copy libs
+      ec_file:copy(filename:join([DownloadDir, "_build", atom_to_list(Env), "lib", Name]), DownloadDir, [recursive]),  %% Copy ebin in app main folder
+      ec_file:copy(DownloadDir, Dir, [recursive]),  %% Copy app main folder into rebar3 tmp dir.
+      %% Return True
       {ok, true};
     Err ->
       Err
   end.
 
-needs_update(Dir, App) ->
-  rebar_git_resource:needs_update(Dir, App).
+needs_update(_Dir, _App) ->
+  false.
 
 make_vsn(_) ->
   {error, "Replacing version of type elixir not supported."}.
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-                                                % Private Functions
+% Private Functions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-download(TmpDir, AppInfo, State, _) ->
-  check_type_support(),
-  case download_(TmpDir, rebar_app_info:source(AppInfo), State) of
-    {ok, _} ->
-      ok;
-    {error, Reason} ->
-      {error, Reason};
-    Error ->
-      {error, Error}
-  end.
 
 download_(Dir, {git, Url}, State) ->
   ?WARN("WARNING: It is recommended to use {branch, Name}, {tag, Tag} or {ref, Ref}, otherwise updating the dep may not work as expected.", []),
