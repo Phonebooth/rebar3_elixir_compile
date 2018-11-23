@@ -65,9 +65,14 @@ download(Dir, {elixir_git, Name, Url, {Type, Vsn}}, State) ->
       Err
   end.
 
-needs_update(_Dir, _App) ->
-  false.
+needs_update(Dir, {elixir_git, Name, Url}) ->
+  needs_update(Dir, {elixir_git, Name, Url, {branch, "master"}});
 
+needs_update(Dir, {elixir_git, _Name, Url, {Type, Vsn}}) ->
+  check_type_support(),
+  Pkg = {git, Url, {Type, Vsn}},
+  needs_update_(Dir, Pkg).
+  
 make_vsn(_) ->
   {error, "Replacing version of type elixir not supported."}.
 
@@ -109,6 +114,45 @@ maybe_warn_local_url(Url) ->
     {error, {malformed_url, _, _}} -> ?WARN(WarnStr, [Url]);
     _ -> ok
   end.
+
+
+needs_update_(Dir, {git, Url, {tag, Tag}}) ->
+  {ok, Current} = rebar_utils:sh(?FMT("git describe --tags --exact-match", []),
+                                 [{cd, Dir}]),
+  Current1 = rebar_string:trim(rebar_string:trim(Current, both, "\n"),
+                               both, "\r"),
+  ?DEBUG("Comparing git tag ~ts with ~ts", [Tag, Current1]),
+  not ((Current1 =:= Tag) andalso compare_url(Dir, Url));
+needs_update_(Dir, {git, Url, {branch, Branch}}) ->
+  %% Fetch remote so we can check if the branch has changed
+  SafeBranch = rebar_utils:escape_chars(Branch),
+  {ok, _} = rebar_utils:sh(?FMT("git fetch origin ~ts", [SafeBranch]),
+                           [{cd, Dir}]),
+  %% Check for new commits to origin/Branch
+  {ok, Current} = rebar_utils:sh(?FMT("git log HEAD..origin/~ts --oneline", [SafeBranch]),
+                                 [{cd, Dir}]),
+  ?DEBUG("Checking git branch ~ts for updates", [Branch]),
+  not ((Current =:= []) andalso compare_url(Dir, Url));
+needs_update_(Dir, {git, Url, "master"}) ->
+  needs_update_(Dir, {git, Url, {branch, "master"}});
+needs_update_(Dir, {git, _, Ref}) ->
+  {ok, Current} = rebar_utils:sh(?FMT("git rev-parse --short=7 -q HEAD", []),
+                                 [{cd, Dir}]),
+  Current1 = rebar_string:trim(rebar_string:trim(Current, both, "\n"),
+                               both, "\r"),
+  Ref2 = case Ref of
+           {ref, Ref1} ->
+             Length = length(Current1),
+             case Length >= 7 of
+               true -> lists:sublist(Ref1, Length);
+               false -> Ref1
+             end;
+           _ ->
+             Ref
+         end,
+
+  ?DEBUG("Comparing git ref ~ts with ~ts", [Ref2, Current1]),
+  (Current1 =/= Ref2).
 
 %% Use different git clone commands depending on git --version
 git_clone(branch,Vsn,Url,Dir,Branch) when Vsn >= {1,7,10}; Vsn =:= undefined ->
@@ -220,3 +264,13 @@ parse_git_url(not_scp, Url) ->
         {error, Reason} ->
             {error, Reason}
     end.
+
+compare_url(Dir, Url) ->
+    {ok, CurrentUrl} = rebar_utils:sh(?FMT("git config --get remote.origin.url", []),
+                                      [{cd, Dir}]),
+    CurrentUrl1 = rebar_string:trim(rebar_string:trim(CurrentUrl, both, "\n"),
+                                     both, "\r"),
+    {ok, ParsedUrl} = parse_git_url(Url),
+    {ok, ParsedCurrentUrl} = parse_git_url(CurrentUrl1),
+    ?DEBUG("Comparing git url ~p with ~p", [ParsedUrl, ParsedCurrentUrl]),
+    ParsedCurrentUrl =:= ParsedUrl.
