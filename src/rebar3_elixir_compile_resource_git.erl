@@ -56,13 +56,10 @@ download(Dir, {elixir_git, Name, Url, {Type, Vsn}}, State) ->
   case download_(DownloadDir, Pkg, BaseDirState) of
     {ok, _} ->
       Env = rebar_state:get(BaseDirState, mix_env),
-      rebar3_elixir_compile_util:compile_libs(BaseDirState),
+      rebar3_elixir_compile_util:compile_libs(BaseDirState, [Name], true),
       LibsDir = rebar3_elixir_compile_util:libs_dir(DownloadDir, Env),
-      %% Copy compile objects
-      rebar3_elixir_compile_util:transfer_libs(rebar_state:set(BaseDirState, libs_target_dir, Dir), [Name], LibsDir),  %% Copy libs
-      ec_file:copy(filename:join([DownloadDir, "_build", atom_to_list(Env), "lib", Name]), DownloadDir, [recursive]),  %% Copy ebin in app main folder
-      ec_file:copy(DownloadDir, Dir, [recursive]),  %% Copy app main folder into rebar3 tmp dir.
-      %% Return True
+      rebar3_elixir_compile_util:transfer_libs(
+        rebar_state:set(BaseDirState, libs_target_dir, Dir), [Name], LibsDir),
       {ok, true};
     Err ->
       Err
@@ -71,10 +68,11 @@ download(Dir, {elixir_git, Name, Url, {Type, Vsn}}, State) ->
 needs_update(Dir, {elixir_git, Name, Url}) ->
   needs_update(Dir, {elixir_git, Name, Url, {branch, "master"}});
 
-needs_update(Dir, {elixir_git, _Name, Url, {Type, Vsn}}) ->
+needs_update(_Dir, {elixir_git, Name, Url, {Type, Vsn}}) ->
   check_type_support(),
   Pkg = {git, Url, {Type, Vsn}},
-  needs_update_(Dir, Pkg).
+  DownloadDir = filename:join(["_elixir_build/", Name]),
+  needs_update_(DownloadDir, Pkg).
   
 make_vsn(_) ->
   {error, "Replacing version of type elixir not supported."}.
