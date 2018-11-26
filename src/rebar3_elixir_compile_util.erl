@@ -151,20 +151,42 @@ add_deps_to_state(State, _Parent, [], _Dir) ->
   State;
 
 add_deps_to_state(State, Parent, [Dep | Deps], Dir) ->
-  {Name, {elixir, Pkg, Vsn}, Level} = Dep,
-  {ok, AppInfo} = rebar_app_info:new(to_binary(Name), Vsn, filename:join([Dir, Name])),
-  AppInfo2 = rebar_app_info:dep_level(AppInfo, Level),
-  AppInfo3 = rebar_app_info:source(AppInfo2, {elixir, Pkg, Vsn}),
-  AppInfo4 = rebar_app_info:parent(AppInfo3, to_binary(Parent)),
-  State2 = case rebar_app_discover:find_app(AppInfo4, filename:join([Dir, to_string(Name)]), all) of
-             {true, AppInfo_} -> case is_member(Name, State) of
-                                   false -> rebar_state:lock(State, AppInfo_);
-                                   true -> State
-                                 end;
-             _ ->  State
-           end,
-  add_deps_to_state(State2, Parent, Deps, Dir).      
-
+  case Dep of
+    {Name, {elixir, Pkg, Vsn}, Level} ->
+      {ok, AppInfo} = rebar_app_info:new(to_binary(Name), Vsn, filename:join([Dir, Name])),
+      AppInfo2 = rebar_app_info:dep_level(AppInfo, Level),
+      AppInfo3 = rebar_app_info:source(AppInfo2, {elixir, Pkg, Vsn}),
+      AppInfo4 = rebar_app_info:parent(AppInfo3, to_binary(Parent)),
+      State2 = case rebar_app_discover:find_app(AppInfo4, filename:join([Dir, to_string(Name)]), all) of
+                 {true, AppInfo_} -> 
+                   io:format("La encuentra: ~p~n", [Pkg]), 
+                   case is_member(Name, State) of
+                     false -> io:format("BIEN: ~p~n", [Pkg]),rebar_state:lock(State, AppInfo_);
+                     true -> State
+                   end;
+                 _ ->  
+                   io:format("No la encuentra: ~p~n", [Pkg]), 
+                   State
+               end,
+      add_deps_to_state(State2, Parent, Deps, Dir);
+    {Name, {elixir_git, Name_, Url, {Type, Vsn}}, Level} ->
+      {ok, AppInfo} = rebar_app_info:new(to_binary(Name), Vsn, filename:join([Dir, Name])),
+      AppInfo2 = rebar_app_info:dep_level(AppInfo, Level),
+      AppInfo3 = rebar_app_info:source(AppInfo2, {elixir_git, Name_, Url, {Type, Vsn}}),
+      AppInfo4 = rebar_app_info:parent(AppInfo3, to_binary(Parent)),
+      State2 = case rebar_app_discover:find_app(AppInfo4, filename:join([Dir, to_string(Name)]), all) of
+                 {true, AppInfo_} -> 
+                   case is_member(Name, State) of
+                     false -> rebar_state:lock(State, AppInfo_);
+                     true -> State
+                   end;
+                 _ ->                     
+                   State
+               end,
+      add_deps_to_state(State2, Parent, Deps, Dir);
+    _ -> State
+  end.
+    
 is_member(Name, State) ->
   is_member(Name, State, rebar_state:lock(State)).
 
@@ -182,7 +204,7 @@ convert_lock(_Lock, [], _Level) ->
 
 convert_lock(Lock, [Dep | Deps], Level) ->
   case Dep of
-    {Name, {hex, Pkg, Vsn, _Hash, _Manager, SubDeps}} ->
+    {Name, {hex, Pkg, Vsn, _Hash, _Manager, SubDeps, _}} ->
       RebarDep = {rebar3_elixir_compile_util:to_binary(Name), {elixir, rebar3_elixir_compile_util:to_string(Pkg), rebar3_elixir_compile_util:to_string(Vsn)}, Level},
       case {SubDeps, is_app_in_code_path(Name)} of
         {[], true} ->
