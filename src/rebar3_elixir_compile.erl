@@ -10,7 +10,7 @@ init(State) ->
   code:add_patha(filename:join(LibDir, "elixir/ebin")),
   code:add_patha(filename:join(LibDir, "mix/ebin")),
   code:add_patha(filename:join(LibDir, "logger/ebin")),
-  State3 = rebar3_elixir_compile_util:add_deps_to_path(State2),
+  State3 = State2, %%rebar3_elixir_compile_util:add_deps_to_path(State2),
   Dir = filename:join(rebar_dir:root_dir(State3), "elixir_libs/"),
   State4 = case rebar_utils:list_dir(Dir) of
              {ok, Apps} -> rebar3_elixir_compile_util:add_deps_to_path(State3, Apps, false);
