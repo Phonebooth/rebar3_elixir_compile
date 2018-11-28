@@ -1,3 +1,10 @@
+**Important note:** from Coowry, we are trying our best with this plugin, nevertheless the code is a bit *terrible* and the main problems of the original implementation in https://github.com/barrel-db/rebar3_elixir_compile are still there: 
+
+- Plugin for compiling elixir does not work very well
+- In particular, it does not recompile code (at least it does not put the recompiled beam code in ./_build)
+- It seems that Elixir dependencies declared in apps (elixir_libs/my_ecto_repo/mix.exs) are not in the Erlang code path
+- It seems that Elixir dependencies declared in rebar.config are not in the Erlang code path
+
 rebar3_elixir_compile
 =====
 [![Hex.pm](https://img.shields.io/hexpm/v/rebar3_elixir_compile.svg?maxAge=2592000?style=flat-square)](https://hex.pm/packages/rebar3_elixir_compile)
